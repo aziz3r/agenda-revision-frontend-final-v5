@@ -28,12 +28,8 @@ type Examen = {
 
 const palette = ['#E3C9B5', '#DDBAA5', '#F3E4D6', '#EAD8C8', '#DFC6B6', '#EEDBCB', '#E8D4C6']
 
-// -------- Helpers -----------------------------------------------------------
-
-// Normalise la réponse Strapi (v5), avec/ sans .attributes
 function normalizeExams(raw: any[]): Examen[] {
   return (raw ?? []).map((it: any) => {
-    // Strapi v5: documentId est au niveau racine
     const docId = it?.documentId ?? it?.attributes?.documentId
     if (it?.attributes) {
       const a = it.attributes
@@ -57,7 +53,6 @@ function normalizeExams(raw: any[]): Examen[] {
         sessions,
       } as Examen
     }
-    // Déjà "flat"
     return it as Examen
   })
 }
@@ -70,29 +65,28 @@ export default function Dashboard() {
   useEffect(() => { load() }, [])
 
   async function load() {
-  setLoading(true); setError(null)
-  try {
-    const { data } = await api.get(
-      '/api/exams'
-      + '?fields[0]=documentId'
-      + '&fields[1]=idexam'
-      + '&fields[2]=nom'
-      + '&fields[3]=date'
-      + '&fields[4]=poids'
-      + '&populate[sessions][fields][0]=documentId'
-      + '&populate[sessions][fields][1]=date_debut'
-      + '&populate[sessions][fields][2]=date_fin'
-      + '&pagination[page]=1&pagination[pageSize]=100'
-      + '&sort[0]=date:asc'
-    )
-    setExams(normalizeExams(data?.data))
-  } catch (e:any) {
-    setError(e?.response?.data?.error?.message || 'Erreur de chargement')
-  } finally {
-    setLoading(false)
+    setLoading(true); setError(null)
+    try {
+      const { data } = await api.get(
+        '/api/exams'
+        + '?fields[0]=documentId'
+        + '&fields[1]=idexam'
+        + '&fields[2]=nom'
+        + '&fields[3]=date'
+        + '&fields[4]=poids'
+        + '&populate[sessions][fields][0]=documentId'
+        + '&populate[sessions][fields][1]=date_debut'
+        + '&populate[sessions][fields][2]=date_fin'
+        + '&pagination[page]=1&pagination[pageSize]=100'
+        + '&sort[0]=date:asc'
+      )
+      setExams(normalizeExams(data?.data))
+    } catch (e: any) {
+      setError(e?.response?.data?.error?.message || 'Erreur de chargement')
+    } finally {
+      setLoading(false)
+    }
   }
-}
-
 
   const colorOf = (seed: number) => palette[seed % palette.length]
 
@@ -149,7 +143,6 @@ export default function Dashboard() {
       return
     }
     try {
-      // 1) Créer toutes les sessions, collecter leurs documentId
       const newSessionDocIds: string[] = []
       for (let i = 0; i < plan.length; i++) {
         const idsession = Number(`${Date.now()}${i}`.slice(-9))
@@ -167,14 +160,11 @@ export default function Dashboard() {
         if (sidDoc) newSessionDocIds.push(sidDoc)
       }
 
-      // 2) Mise à jour de la relation via documentId de l'exam
-      //    Tentative 1: 'connect' (ajoute sans écraser)
       try {
         await api.put(`/api/exams/${ex.documentId}`, {
           data: { sessions: { connect: newSessionDocIds } }
         })
       } catch {
-        // 2-bis) Fallback: 'set' avec la liste complète (existants + nouveaux)
         const exFull = await api.get(
           `/api/exams/${ex.documentId}?populate[sessions][fields][0]=documentId`
         )
@@ -182,9 +172,8 @@ export default function Dashboard() {
           exFull?.data?.data?.attributes?.sessions?.data?.map((x: any) => x.documentId) ??
           exFull?.data?.data?.sessions?.map((x: any) => x.documentId) ?? []
         const all = Array.from(new Set([...(existingDocIds || []), ...newSessionDocIds]))
-
         await api.put(`/api/exams/${ex.documentId}`, {
-          data: { sessions: all } // 'set' implicite en envoyant le tableau complet
+          data: { sessions: all }
         })
       }
 
@@ -192,6 +181,49 @@ export default function Dashboard() {
       alert('✅ Planning généré et enregistré')
     } catch (e: any) {
       alert(e?.response?.data?.error?.message || '❌ Échec lors de la génération.')
+      console.error(e?.response?.data || e)
+    }
+  }
+
+  // 🔴 NOUVEAU : suppression du planning (déconnecte puis supprime les sessions)
+  async function deletePlanOnServer(ex: Examen) {
+    try {
+      // 1) Récupérer les documentId des sessions liées
+      let sessDocIds: string[] =
+        (ex.sessions ?? []).map(s => s.documentId).filter(Boolean as any) as string[]
+      if (sessDocIds.length === 0) {
+        const exFull = await api.get(
+          `/api/exams/${ex.documentId}?populate[sessions][fields][0]=documentId`
+        )
+        sessDocIds =
+          exFull?.data?.data?.attributes?.sessions?.data?.map((x: any) => x.documentId) ??
+          exFull?.data?.data?.sessions?.map((x: any) => x.documentId) ?? []
+      }
+
+      if (sessDocIds.length === 0) {
+        alert('Aucune session de révision à supprimer pour cet examen.')
+        return
+      }
+
+      // 2) Déconnecter les relations (safe)
+      try {
+        await api.put(`/api/exams/${ex.documentId}`, {
+          data: { sessions: { disconnect: sessDocIds } }
+        })
+      } catch {
+        // Fallback: écraser la liste
+        await api.put(`/api/exams/${ex.documentId}`, { data: { sessions: [] } })
+      }
+
+      // 3) Supprimer les sessions
+      for (const sdid of sessDocIds) {
+        await api.delete(`/api/sessions/${sdid}`)
+      }
+
+      await load()
+      alert('🗑️ Planning supprimé')
+    } catch (e: any) {
+      alert(e?.response?.data?.error?.message || '❌ Échec lors de la suppression du planning.')
       console.error(e?.response?.data || e)
     }
   }
@@ -217,9 +249,15 @@ export default function Dashboard() {
                     {ex.date ? new Date(ex.date).toLocaleString() : '—'} • poids {ex.poids ?? '—'}
                   </div>
                 </div>
-                <button className="btn brand" onClick={() => createPlanOnServer(ex)}>
-                  Générer le planning
-                </button>
+                <div className="controls" style={{ display:'flex', gap:8 }}>
+                  <button className="btn brand" onClick={() => createPlanOnServer(ex)}>
+                    Générer le planning
+                  </button>
+                  {/* 🔴 Nouveau bouton */}
+                  <button className="btn danger" onClick={() => deletePlanOnServer(ex)}>
+                    Supprimer le planning
+                  </button>
+                </div>
               </div>
             ))
           )}
