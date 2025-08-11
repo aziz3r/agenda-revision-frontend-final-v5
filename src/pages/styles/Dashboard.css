@@ -1,0 +1,15 @@
+.dash-grid{ display:grid; grid-template-columns: 380px 1fr; gap:16px; }
+.dash-list{ display:flex; flex-direction:column; gap:10px; }
+.dash-exam{ display:flex; align-items:center; gap:10px; padding:10px 8px; border:1px solid var(--line); border-radius:12px; background:#fffdfa }
+.dash-exam .dot{ width:10px; height:10px; border-radius:50% }
+.dash-exam .info{ flex:1 }
+.dash-exam .tt{ font-weight:700; color:#4b3f37 }
+.dash-exam .sub{ font-size:12px; color:#7a706a }
+
+.cal-card .fc-theme-standard .fc-scrollgrid{ border:1px solid var(--line) }
+.cal-card .fc-theme-standard td, 
+.cal-card .fc-theme-standard th{ border-color:var(--line) }
+.cal-card .fc .fc-daygrid-day-number{ color:#6e4f3e }
+.cal-card .fc .fc-toolbar-title{ color:#4b3f37 }
+.cal-card .fc .fc-button{ background:#E3C9B5; border:none; border-radius:10px; }
+.cal-card .fc .fc-button:hover{ background:#D9B8A6; }
