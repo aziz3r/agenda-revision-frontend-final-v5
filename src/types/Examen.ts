@@ -5,6 +5,7 @@ export type Examen = {
   date: string | null
   poids: number | null
   examReference?: string | null
+  documentId: string ;
   // pas de 'matiere' côté Exam (relation manyWay côté Matiere)
   type?: 'controle' | 'partiel' | 'final' | string
 }

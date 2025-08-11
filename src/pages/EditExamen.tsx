@@ -12,6 +12,7 @@ type Examen = {
   date: string | null
   poids: number | null
   examReference?: string | null
+  documentId: string;
 }
 
 export default function EditExamen() {
@@ -37,7 +38,7 @@ export default function EditExamen() {
     if (!exam) return
     try {
       setBusy(true)
-      await api.put(`/api/exams/${exam.id}`, {
+      await api.put(`/api/exams/${exam.documentId}`, {
         data: {
           idexam: exam.idexam,
           nom: exam.nom,

@@ -37,7 +37,7 @@ export default function Examens() {
                   <td>{ex.poids ?? '—'}</td>
                   <td className="actions">
                     <div className="controls">
-                      <Link className="btn" to={`/examens/${ex.id}/edit`}>Éditer</Link>
+                      <Link className="btn" to={`/examens/${ex.documentId}/edit`}>Éditer</Link>
                       <button className="btn danger" onClick={() => d(deleteExam(ex.id))}>Supprimer</button>
                     </div>
                   </td>
