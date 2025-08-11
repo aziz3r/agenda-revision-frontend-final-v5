@@ -38,7 +38,8 @@ export default function Examens() {
                   <td className="actions">
                     <div className="controls">
                       <Link className="btn" to={`/examens/${ex.documentId}/edit`}>Éditer</Link>
-                      <button className="btn danger" onClick={() => d(deleteExam(ex.id))}>Supprimer</button>
+                      {/* ✅ Seule ligne modifiée : utiliser documentId pour Strapi v5 */}
+                      <button className="btn danger" onClick={() => d(deleteExam(ex.documentId))}>Supprimer</button>
                     </div>
                   </td>
                 </tr>

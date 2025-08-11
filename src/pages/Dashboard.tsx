@@ -8,6 +8,7 @@ import './styles/Dashboard.css'
 
 type Session = {
   id: number
+  documentId: string
   idsession: number
   date_debut: string
   date_fin: string
@@ -17,6 +18,7 @@ type Session = {
 
 type Examen = {
   id: number | string
+  documentId: string
   idexam: string
   nom: string
   date: string | null
@@ -26,16 +28,19 @@ type Examen = {
 
 const palette = ['#E3C9B5', '#DDBAA5', '#F3E4D6', '#EAD8C8', '#DFC6B6', '#EEDBCB', '#E8D4C6']
 
-// ---- Helpers ---------------------------------------------------------------
+// -------- Helpers -----------------------------------------------------------
 
-// Normalise la réponse Strapi (avec ou sans .attributes)
+// Normalise la réponse Strapi (v5), avec/ sans .attributes
 function normalizeExams(raw: any[]): Examen[] {
   return (raw ?? []).map((it: any) => {
+    // Strapi v5: documentId est au niveau racine
+    const docId = it?.documentId ?? it?.attributes?.documentId
     if (it?.attributes) {
       const a = it.attributes
-      const sessions =
+      const sessions: Session[] =
         a.sessions?.data?.map((s: any) => ({
           id: s.id,
+          documentId: s.documentId ?? s.attributes?.documentId,
           idsession: s.attributes?.idsession,
           date_debut: s.attributes?.date_debut,
           date_fin: s.attributes?.date_fin,
@@ -44,6 +49,7 @@ function normalizeExams(raw: any[]): Examen[] {
         })) ?? []
       return {
         id: it.id,
+        documentId: docId,
         idexam: a.idexam,
         nom: a.nom,
         date: a.date,
@@ -56,21 +62,6 @@ function normalizeExams(raw: any[]): Examen[] {
   })
 }
 
-// Résout l'ID Strapi à partir d'un examen (via idexam)
-async function resolveStrapiId(ex: Examen): Promise<number> {
-  const candidate = Number(ex.id)
-  if (Number.isInteger(candidate) && candidate > 0) return candidate
-
-  const res = await api.get(
-    `/api/exams?filters[idexam][$eq]=${encodeURIComponent(ex.idexam)}&fields[0]=id&pagination[pageSize]=1`
-  )
-  const strapid = res?.data?.data?.[0]?.id
-  if (!strapid) throw new Error("Examen introuvable côté Strapi (résolution d'ID).")
-  return strapid
-}
-
-// ---- Component -------------------------------------------------------------
-
 export default function Dashboard() {
   const [exams, setExams] = useState<Examen[]>([])
   const [loading, setLoading] = useState(false)
@@ -79,28 +70,38 @@ export default function Dashboard() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    setLoading(true); setError(null)
-    try {
-      // On récupère aussi l'id des sessions pour un éventuel fallback "set"
-      const { data } = await api.get(
-        '/api/exams?populate[sessions][fields][0]=id&populate[sessions][fields][1]=date_debut&populate[sessions][fields][2]=date_fin&pagination[page]=1&pagination[pageSize]=100&sort[0]=date:asc'
-      )
-      setExams(normalizeExams(data?.data))
-    } catch (e: any) {
-      setError(e?.response?.data?.error?.message || 'Erreur de chargement')
-    } finally {
-      setLoading(false)
-    }
+  setLoading(true); setError(null)
+  try {
+    const { data } = await api.get(
+      '/api/exams'
+      + '?fields[0]=documentId'
+      + '&fields[1]=idexam'
+      + '&fields[2]=nom'
+      + '&fields[3]=date'
+      + '&fields[4]=poids'
+      + '&populate[sessions][fields][0]=documentId'
+      + '&populate[sessions][fields][1]=date_debut'
+      + '&populate[sessions][fields][2]=date_fin'
+      + '&pagination[page]=1&pagination[pageSize]=100'
+      + '&sort[0]=date:asc'
+    )
+    setExams(normalizeExams(data?.data))
+  } catch (e:any) {
+    setError(e?.response?.data?.error?.message || 'Erreur de chargement')
+  } finally {
+    setLoading(false)
   }
+}
 
-  const colorOf = (id: number) => palette[id % palette.length]
+
+  const colorOf = (seed: number) => palette[seed % palette.length]
 
   const events = useMemo(() => {
     const evts: any[] = []
     exams.forEach(ex => {
       if (ex.date) {
         evts.push({
-          id: `exam-${ex.id}`,
+          id: `exam-${ex.documentId}`,
           title: `Examen · ${ex.nom}`,
           start: ex.date,
           end: ex.date,
@@ -111,7 +112,7 @@ export default function Dashboard() {
       }
       (ex.sessions ?? []).forEach((s, i) => {
         evts.push({
-          id: `sess-${ex.id}-${s?.id ?? i}`,
+          id: `sess-${ex.documentId}-${s?.documentId ?? i}`,
           title: `Révision · ${ex.nom}`,
           start: s.date_debut,
           end: s.date_fin,
@@ -148,8 +149,8 @@ export default function Dashboard() {
       return
     }
     try {
-      // 1) Créer toutes les sessions
-      const newSessionIds: number[] = []
+      // 1) Créer toutes les sessions, collecter leurs documentId
+      const newSessionDocIds: string[] = []
       for (let i = 0; i < plan.length; i++) {
         const idsession = Number(`${Date.now()}${i}`.slice(-9))
         const s = plan[i]
@@ -162,30 +163,28 @@ export default function Dashboard() {
             commentaire: `Plan auto pour ${ex.nom}`
           }
         })
-        const sid = created?.data?.data?.id
-        if (sid) newSessionIds.push(sid)
+        const sidDoc = created?.data?.data?.documentId
+        if (sidDoc) newSessionDocIds.push(sidDoc)
       }
 
-      // 2) Résoudre l'ID Strapi de l'examen (évite le 404 sur /api/exams/:id)
-      const strapid = await resolveStrapiId(ex)
-
-      // 3) Tentative 1: connect (partiel, n'écrase pas)
+      // 2) Mise à jour de la relation via documentId de l'exam
+      //    Tentative 1: 'connect' (ajoute sans écraser)
       try {
-        await api.put(`/api/exams/${strapid}`, {
-          data: { sessions: { connect: newSessionIds } }
+        await api.put(`/api/exams/${ex.documentId}`, {
+          data: { sessions: { connect: newSessionDocIds } }
         })
-      } catch (err: any) {
-        // 3-bis) Fallback: "set" avec la liste complète (existants + nouveaux)
+      } catch {
+        // 2-bis) Fallback: 'set' avec la liste complète (existants + nouveaux)
         const exFull = await api.get(
-          `/api/exams/${strapid}?populate[sessions][fields][0]=id`
+          `/api/exams/${ex.documentId}?populate[sessions][fields][0]=documentId`
         )
-        const existingIds: number[] =
-          exFull?.data?.data?.attributes?.sessions?.data?.map((x: any) => x.id) ??
-          exFull?.data?.data?.sessions?.map((x: any) => x.id) ?? []
-        const all = Array.from(new Set([...existingIds, ...newSessionIds]))
+        const existingDocIds: string[] =
+          exFull?.data?.data?.attributes?.sessions?.data?.map((x: any) => x.documentId) ??
+          exFull?.data?.data?.sessions?.map((x: any) => x.documentId) ?? []
+        const all = Array.from(new Set([...(existingDocIds || []), ...newSessionDocIds]))
 
-        await api.put(`/api/exams/${strapid}`, {
-          data: { sessions: all }
+        await api.put(`/api/exams/${ex.documentId}`, {
+          data: { sessions: all } // 'set' implicite en envoyant le tableau complet
         })
       }
 
@@ -210,7 +209,7 @@ export default function Dashboard() {
             <p className="small">Aucun examen</p>
           ) : (
             exams.map(ex => (
-              <div key={String(ex.id)} className="dash-exam">
+              <div key={String(ex.documentId)} className="dash-exam">
                 <div className="dot" style={{ background: colorOf(Number(ex.id) || 0) }} />
                 <div className="info">
                   <div className="tt">{ex.nom}</div>
