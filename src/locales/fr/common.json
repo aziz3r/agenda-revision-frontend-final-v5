@@ -1,26 +1,89 @@
 {
+  "app": {
+    "title": "Agenda de Révision"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "exams": "Examens",
+    "add": "Ajouter"
+  },
   "common": {
     "loading": "Chargement…",
-    "error": "Erreur"
+    "loadingError": "Erreur de chargement",
+    "error": "Erreur",
+    "save": "Enregistrer"
   },
   "actions": {
-    "edit": "Éditer",
+    "edit": "Modifier",
     "delete": "Supprimer",
     "prev": "Précédent",
     "next": "Suivant"
   },
   "examens": {
     "title": "Examens",
-    "addLabel": "+ Ajouter",
-    "page_of": "Page {{page}} / {{pageCount}}",
+    "addLabel": "Ajouter",
     "cols": {
       "id": "ID",
-      "idexam": "IDExam",
+      "idexam": "ID Examen",
       "ref": "Référence",
       "name": "Nom",
       "date": "Date",
       "weight": "Poids",
       "actions": "Actions"
+    },
+    "page_of": "Page {{page}} / {{pageCount}}"
+  },
+  "addExam": {
+    "title": "Ajouter un examen",
+    "created": "✅ Examen ajouté !",
+    "createFailed": "❌ Échec de la création.",
+    "form": {
+      "fillAll": "❌ Remplis tous les champs."
+    },
+    "fields": {
+      "idexam": "ID Examen",
+      "nom": "Nom",
+      "date": "Date",
+      "datePlaceholder": "Sélectionne la date et l'heure",
+      "poids": "Poids"
+    }
+  },
+  "editExam": {
+    "title": "✏️ Éditer l’examen #{{id}}",
+    "updated": "✅ Examen mis à jour",
+    "updateFailed": "❌ Échec de la mise à jour.",
+    "fields": {
+      "idexam": "ID Examen",
+      "nom": "Nom",
+      "date": "Date",
+      "poids": "Poids",
+      "referenceAuto": "Référence (auto)"
+    },
+    "actions": {
+      "update": "Mettre à jour"
+    }
+  },
+  "dash": {
+    "nextExams": "Prochains examens",
+    "none": "Aucun examen",
+    "weight": "poids",
+    "calendar": "Calendrier",
+    "actions": {
+      "generatePlan": "Générer le planning",
+      "deletePlan": "Supprimer le planning"
+    },
+    "event": {
+      "exam": "Examen · {{nom}}",
+      "session": "Révision · {{nom}}"
+    },
+    "plan": {
+      "missing": "Renseigne 'date' et 'poids' pour générer un planning.",
+      "autoComment": "Plan auto pour {{nom}}",
+      "generated": "✅ Planning généré et enregistré",
+      "generateFailed": "❌ Échec lors de la génération.",
+      "nothingToDelete": "Aucune session de révision à supprimer pour cet examen.",
+      "deleted": "🗑️ Planning supprimé",
+      "deleteFailed": "❌ Échec lors de la suppression du planning."
     }
   }
 }

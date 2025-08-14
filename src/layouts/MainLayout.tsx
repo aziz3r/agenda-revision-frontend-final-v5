@@ -1,7 +1,8 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import './MainLayout.css'
+import { useTranslation } from 'react-i18next'
+import LangSwitch from '../components/LangSwitch'
 
-// Petites icônes SVG (aucune lib requise)
 const IconHome = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
     <path d="M3 10.5 12 3l9 7.5v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
@@ -19,28 +20,32 @@ const IconPlus = () => (
 )
 
 export default function MainLayout() {
+  const { t } = useTranslation()
+
   return (
     <div className="app">
       <header className="nav dark-pill">
         <div className="nav-inner">
-          <h1 className="brand">Agenda de Révision</h1>
+          <h1 className="brand">{t('app.title')}</h1>
 
-          {/* Barre segmentée style “card” noire */}
           <nav className="segmented">
             <NavLink to="/" end className={({isActive}) => 'seg-item' + (isActive ? ' active' : '')}>
               <span className="icon"><IconHome/></span>
-              <span className="label">Dashboard</span>
+              <span className="label">{t('nav.dashboard')}</span>
             </NavLink>
 
             <NavLink to="/examens" className={({isActive}) => 'seg-item' + (isActive ? ' active' : '')}>
               <span className="icon"><IconList/></span>
-              <span className="label">Examens</span>
+              <span className="label">{t('nav.exams')}</span>
             </NavLink>
 
             <NavLink to="/examens/add" className={({isActive}) => 'seg-item' + (isActive ? ' active' : '')}>
               <span className="icon"><IconPlus/></span>
-              <span className="label">Ajouter</span>
+              <span className="label">{t('nav.add')}</span>
             </NavLink>
+
+            {/* Sélecteur de langue */}
+            <LangSwitch />
           </nav>
         </div>
       </header>

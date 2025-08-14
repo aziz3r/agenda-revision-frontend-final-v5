@@ -5,6 +5,7 @@ import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { api } from '../api/client'
 import './styles/Dashboard.css'
+import { useTranslation } from 'react-i18next'
 
 type Session = {
   id: number
@@ -58,6 +59,7 @@ function normalizeExams(raw: any[]): Examen[] {
 }
 
 export default function Dashboard() {
+  const { t } = useTranslation()
   const [exams, setExams] = useState<Examen[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -82,7 +84,7 @@ export default function Dashboard() {
       )
       setExams(normalizeExams(data?.data))
     } catch (e: any) {
-      setError(e?.response?.data?.error?.message || 'Erreur de chargement')
+      setError(e?.response?.data?.error?.message || t('common.loadingError'))
     } finally {
       setLoading(false)
     }
@@ -90,13 +92,14 @@ export default function Dashboard() {
 
   const colorOf = (seed: number) => palette[seed % palette.length]
 
+// eslint-disable-next-line react-hooks/exhaustive-deps
   const events = useMemo(() => {
     const evts: any[] = []
     exams.forEach(ex => {
       if (ex.date) {
         evts.push({
           id: `exam-${ex.documentId}`,
-          title: `Examen · ${ex.nom}`,
+          title: t('dash.event.exam', { nom: ex.nom }),
           start: ex.date,
           end: ex.date,
           allDay: false,
@@ -107,7 +110,7 @@ export default function Dashboard() {
       (ex.sessions ?? []).forEach((s, i) => {
         evts.push({
           id: `sess-${ex.documentId}-${s?.documentId ?? i}`,
-          title: `Révision · ${ex.nom}`,
+          title: t('dash.event.session', { nom: ex.nom }),
           start: s.date_debut,
           end: s.date_fin,
           color: colorOf(Number(ex.id) || 0),
@@ -139,7 +142,7 @@ export default function Dashboard() {
   async function createPlanOnServer(ex: Examen) {
     const plan = generatePlan(ex)
     if (plan.length === 0) {
-      alert("Renseigne 'date' et 'poids' pour générer un planning.")
+      alert(t("dash.plan.missing"))
       return
     }
     try {
@@ -153,7 +156,7 @@ export default function Dashboard() {
             date_debut: s.start.toISOString(),
             date_fin: s.fin.toISOString(),
             avancement: 0,
-            commentaire: `Plan auto pour ${ex.nom}`
+            commentaire: t('dash.plan.autoComment', { nom: ex.nom })
           }
         })
         const sidDoc = created?.data?.data?.documentId
@@ -178,17 +181,15 @@ export default function Dashboard() {
       }
 
       await load()
-      alert('✅ Planning généré et enregistré')
+      alert(t('dash.plan.generated'))
     } catch (e: any) {
-      alert(e?.response?.data?.error?.message || '❌ Échec lors de la génération.')
+      alert(e?.response?.data?.error?.message || t('dash.plan.generateFailed'))
       console.error(e?.response?.data || e)
     }
   }
 
-  // 🔴 NOUVEAU : suppression du planning (déconnecte puis supprime les sessions)
   async function deletePlanOnServer(ex: Examen) {
     try {
-      // 1) Récupérer les documentId des sessions liées
       let sessDocIds: string[] =
         (ex.sessions ?? []).map(s => s.documentId).filter(Boolean as any) as string[]
       if (sessDocIds.length === 0) {
@@ -201,29 +202,26 @@ export default function Dashboard() {
       }
 
       if (sessDocIds.length === 0) {
-        alert('Aucune session de révision à supprimer pour cet examen.')
+        alert(t('dash.plan.nothingToDelete'))
         return
       }
 
-      // 2) Déconnecter les relations (safe)
       try {
         await api.put(`/api/exams/${ex.documentId}`, {
           data: { sessions: { disconnect: sessDocIds } }
         })
       } catch {
-        // Fallback: écraser la liste
         await api.put(`/api/exams/${ex.documentId}`, { data: { sessions: [] } })
       }
 
-      // 3) Supprimer les sessions
       for (const sdid of sessDocIds) {
         await api.delete(`/api/sessions/${sdid}`)
       }
 
       await load()
-      alert('🗑️ Planning supprimé')
+      alert(t('dash.plan.deleted'))
     } catch (e: any) {
-      alert(e?.response?.data?.error?.message || '❌ Échec lors de la suppression du planning.')
+      alert(e?.response?.data?.error?.message || t('dash.plan.deleteFailed'))
       console.error(e?.response?.data || e)
     }
   }
@@ -232,13 +230,13 @@ export default function Dashboard() {
     <div className="dash-grid">
       <section className="card">
         <div className="card-header">
-          <strong>Prochains examens</strong>
+          <strong>{t('dash.nextExams')}</strong>
         </div>
         <div className="card-body dash-list">
-          {loading && <p className="small">Chargement…</p>}
-          {error && <p className="small" role="alert">Erreur: {error}</p>}
+          {loading && <p className="small">{t('common.loading')}</p>}
+          {error && <p className="small" role="alert">{t('common.error')}: {error}</p>}
           {exams.length === 0 ? (
-            <p className="small">Aucun examen</p>
+            <p className="small">{t('dash.none')}</p>
           ) : (
             exams.map(ex => (
               <div key={String(ex.documentId)} className="dash-exam">
@@ -246,16 +244,15 @@ export default function Dashboard() {
                 <div className="info">
                   <div className="tt">{ex.nom}</div>
                   <div className="sub">
-                    {ex.date ? new Date(ex.date).toLocaleString() : '—'} • poids {ex.poids ?? '—'}
+                    {ex.date ? new Date(ex.date).toLocaleString() : '—'} • {t('dash.weight')} {ex.poids ?? '—'}
                   </div>
                 </div>
                 <div className="controls" style={{ display:'flex', gap:8 }}>
                   <button className="btn brand" onClick={() => createPlanOnServer(ex)}>
-                    Générer le planning
+                    {t('dash.actions.generatePlan')}
                   </button>
-                  {/* 🔴 Nouveau bouton */}
                   <button className="btn danger" onClick={() => deletePlanOnServer(ex)}>
-                    Supprimer le planning
+                    {t('dash.actions.deletePlan')}
                   </button>
                 </div>
               </div>
@@ -265,7 +262,7 @@ export default function Dashboard() {
       </section>
 
       <section className="card cal-card">
-        <div className="card-header"><strong>Calendrier</strong></div>
+        <div className="card-header"><strong>{t('dash.calendar')}</strong></div>
         <div className="card-body">
           <FullCalendar
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}

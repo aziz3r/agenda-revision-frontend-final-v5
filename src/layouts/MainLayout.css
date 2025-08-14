@@ -33,6 +33,7 @@
   box-shadow:0 6px 20px rgba(0,0,0,.2), inset 0 0 0 1px rgba(255,255,255,.06);
 }
 
+/* Items (liens + boutons LangSwitch) */
 .seg-item{
   display:flex; align-items:center; gap:8px;
   color:var(--pill-ink);
@@ -40,6 +41,12 @@
   padding:6px 8px;
   border-radius:9999px;
   transition:background .15s, color .15s, transform .08s;
+  font-family: var(--font-sans);
+  font-weight:600;
+  line-height:1;
+  cursor:pointer;                 /* permet le pointeur sur <button> comme sur <a> */
+  border:0; background:transparent; /* reset bouton natif */
+  -webkit-appearance:none; appearance:none; /* reset natif boutons */
 }
 .seg-item .icon{ display:grid; place-items:center; width:28px; height:28px; }
 .seg-item .label{ display:none; font-weight:700; font-size:var(--fz-sm); }
@@ -47,18 +54,35 @@
 /* état au survol */
 .seg-item:hover{ color:#ffffffcc; transform:translateY(-1px); }
 
-/* pastille active blanche avec libellé visible (comme sur ta maquette) */
-.seg-item.active{
+/* Focus clavier accessible */
+.seg-item:focus-visible{
+  outline:2px solid #fff; outline-offset:2px;
+  box-shadow:0 0 0 2px rgba(255,255,255,.3);
+}
+
+/* pastille active : route active (.active) OU langue active ([aria-pressed="true"]) */
+.seg-item.active,
+.seg-item[aria-pressed="true"]{
   background:var(--pill-active);
   color:#111322;
   box-shadow:0 4px 10px rgba(0,0,0,.18);
 }
-.seg-item.active .label{ display:inline-block; }
+.seg-item.active .label,
+.seg-item[aria-pressed="true"] .label{ display:inline-block; }
 
 /* responsive : sur petits écrans, la pastille garde le label, les autres restent icônes seules */
 @media (max-width: 760px){
   .nav-inner{ gap:12px; }
   .seg-item .icon{ width:26px; height:26px; }
 }
+
 .container{ padding:16px; }
 .nav, .segmented, .seg-item, .brand { font-family: var(--font-sans); }
+
+/* (Optionnel) petit séparateur vertical si tu veux isoler FR/EN des liens
+   -> ajoute <div class="seg-sep" aria-hidden="true"></div> entre les deux groupes */
+.seg-sep{
+  width:1px; height:24px;
+  background:rgba(255,255,255,.14);
+  border-radius:1px;
+}

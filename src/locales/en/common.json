@@ -1,7 +1,17 @@
 {
+  "app": {
+    "title": "Revision Agenda"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "exams": "Exams",
+    "add": "Add"
+  },
   "common": {
     "loading": "Loading…",
-    "error": "Error"
+    "loadingError": "Loading error",
+    "error": "Error",
+    "save": "Save"
   },
   "actions": {
     "edit": "Edit",
@@ -11,16 +21,69 @@
   },
   "examens": {
     "title": "Exams",
-    "addLabel": "+ Add",
-    "page_of": "Page {{page}} / {{pageCount}}",
+    "addLabel": "Add",
     "cols": {
       "id": "ID",
-      "idexam": "IDExam",
+      "idexam": "Exam ID",
       "ref": "Reference",
       "name": "Name",
       "date": "Date",
       "weight": "Weight",
       "actions": "Actions"
+    },
+    "page_of": "Page {{page}} / {{pageCount}}"
+  },
+  "addExam": {
+    "title": "Add an exam",
+    "created": "✅ Exam created!",
+    "createFailed": "❌ Creation failed.",
+    "form": {
+      "fillAll": "❌ Please fill in all fields."
+    },
+    "fields": {
+      "idexam": "Exam ID",
+      "nom": "Name",
+      "date": "Date",
+      "datePlaceholder": "Select date and time",
+      "poids": "Weight"
+    }
+  },
+  "editExam": {
+    "title": "✏️ Edit exam #{{id}}",
+    "updated": "✅ Exam updated",
+    "updateFailed": "❌ Update failed.",
+    "fields": {
+      "idexam": "Exam ID",
+      "nom": "Name",
+      "date": "Date",
+      "poids": "Weight",
+      "referenceAuto": "Reference (auto)"
+    },
+    "actions": {
+      "update": "Update"
+    }
+  },
+  "dash": {
+    "nextExams": "Upcoming exams",
+    "none": "No exams",
+    "weight": "weight",
+    "calendar": "Calendar",
+    "actions": {
+      "generatePlan": "Generate plan",
+      "deletePlan": "Delete plan"
+    },
+    "event": {
+      "exam": "Exam · {{nom}}",
+      "session": "Revision · {{nom}}"
+    },
+    "plan": {
+      "missing": "Please set both 'date' and 'weight' to generate a plan.",
+      "autoComment": "Auto plan for {{nom}}",
+      "generated": "✅ Plan generated and saved",
+      "generateFailed": "❌ Failed to generate.",
+      "nothingToDelete": "No revision sessions to delete for this exam.",
+      "deleted": "🗑️ Plan deleted",
+      "deleteFailed": "❌ Failed to delete the plan."
     }
   }
 }
