@@ -6,6 +6,7 @@ import interactionPlugin from '@fullcalendar/interaction'
 import { api } from '../api/client'
 import './styles/Dashboard.css'
 import { useTranslation } from 'react-i18next'
+import { getAuth } from '../auth' // 🆕 on récupère l'user.id (plus sûr que l'email)
 
 type Session = {
   id: number
@@ -69,22 +70,52 @@ export default function Dashboard() {
   async function load() {
     setLoading(true); setError(null)
     try {
-      const { data } = await api.get(
-        '/api/exams'
-        + '?fields[0]=documentId'
-        + '&fields[1]=idexam'
-        + '&fields[2]=nom'
-        + '&fields[3]=date'
-        + '&fields[4]=poids'
-        + '&populate[sessions][fields][0]=documentId'
-        + '&populate[sessions][fields][1]=date_debut'
-        + '&populate[sessions][fields][2]=date_fin'
-        + '&pagination[page]=1&pagination[pageSize]=100'
-        + '&sort[0]=date:asc'
-      )
-      setExams(normalizeExams(data?.data))
+      const userId = getAuth()?.user?.id
+      // Noms possibles de l'attribut de relation dans le CT "Exam" (ajuste si besoin)
+      const REL_KEYS = ['eleves', 'eleve', 'students']
+
+      // paramètres communs (on laisse axios sérialiser via paramsSerializer)
+      const baseParams: any = {
+        fields: ['documentId', 'idexam', 'nom', 'date', 'poids'],
+        populate: { sessions: { fields: ['documentId', 'date_debut', 'date_fin'] } },
+        pagination: { page: 1, pageSize: 100 },
+        sort: ['date:asc']
+      }
+
+      let found = false
+      let lastErr: any = null
+
+      for (const key of REL_KEYS) {
+        try {
+          const params = {
+            ...baseParams,
+            // filtre par user.id : Exam -> (relation Eleve) -> (relation user) -> id
+            filters: { [key]: { user: { id: { $eq: userId ?? '' } } } }
+          }
+          const { data } = await api.get('/api/exams', { params })
+          setExams(normalizeExams(data?.data))
+          found = true
+          break
+        } catch (e: any) {
+          lastErr = e
+          const msg: string = e?.response?.data?.error?.message || ''
+          // si c’est bien une 400 "Invalid key <...>", on essaie la clé suivante
+          if (e?.response?.status === 400 && /Invalid key/i.test(msg)) {
+            continue
+          }
+          // autre erreur (403, réseau, etc.) -> on la propage
+          throw e
+        }
+      }
+
+      if (!found) {
+        // toutes les clés ont échoué (probablement pas le bon nom de relation)
+        throw lastErr ?? new Error('Invalid relation key on Exam')
+      }
     } catch (e: any) {
       setError(e?.response?.data?.error?.message || t('common.loadingError'))
+      console.error('[Dashboard load]', e?.response?.data || e)
+      setExams([]) // évite un état incohérent
     } finally {
       setLoading(false)
     }
@@ -92,7 +123,7 @@ export default function Dashboard() {
 
   const colorOf = (seed: number) => palette[seed % palette.length]
 
-// eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const events = useMemo(() => {
     const evts: any[] = []
     exams.forEach(ex => {
@@ -107,7 +138,7 @@ export default function Dashboard() {
           textColor: '#3b2f29'
         })
       }
-      (ex.sessions ?? []).forEach((s, i) => {
+      ;(ex.sessions ?? []).forEach((s, i) => {
         evts.push({
           id: `sess-${ex.documentId}-${s?.documentId ?? i}`,
           title: t('dash.event.session', { nom: ex.nom }),
@@ -142,7 +173,7 @@ export default function Dashboard() {
   async function createPlanOnServer(ex: Examen) {
     const plan = generatePlan(ex)
     if (plan.length === 0) {
-      alert(t("dash.plan.missing"))
+      alert(t('dash.plan.missing'))
       return
     }
     try {
