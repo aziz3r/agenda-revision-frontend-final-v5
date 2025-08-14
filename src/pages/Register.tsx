@@ -1,3 +1,4 @@
+// src/pages/Register.tsx
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -5,22 +6,19 @@ import { api } from '../api/client'
 import { saveAuth } from '../auth'
 import './styles/AddExamen.css'
 
-// 🔧 si la relation dans le CT Élève ne s'appelle pas "user", change ce nom
 const ELEVE_USER_FIELD = 'user'
 
-// ── helpers API ─────────────────────────────────────────────────────────────
+// === helpers ================================================================
 
 async function registerUser(username: string, email: string, password: string) {
   const { data } = await api.post('/api/auth/local/register', { username, email, password })
   return data // { jwt?, user }
 }
-
 async function loginUser(identifier: string, password: string) {
   const { data } = await api.post('/api/auth/local', { identifier, password })
   return data // { jwt, user }
 }
 
-// Retourne documentId si un élève avec cet email existe déjà
 async function findEleveByEmail(email: string): Promise<string | null> {
   try {
     const { data } = await api.get('/api/eleves', {
@@ -35,32 +33,38 @@ async function findEleveByEmail(email: string): Promise<string | null> {
   } catch { return null }
 }
 
-// Crée l'élève SANS relation au user (création séparée)
-async function createEleve(payload: {
-  nom: string
-  email_eleve: string
-  ideleve?: number
-  mot_de_passe?: string   // <-- ne garder que si ton CT l'exige
-}): Promise<string> {
-  const { data } = await api.post('/api/eleves', { data: payload })
-  return String(data?.data?.documentId)
+async function createEleveSmart({
+  nom, email, ideleve, password
+}: { nom: string; email: string; ideleve?: string; password: string; }) {
+  const base: any = { nom, email_eleve: email, ...(ideleve ? { ideleve: Number(ideleve) } : {}) }
+  // tentative AVEC mot_de_passe (si le champ existe/requis)
+  try {
+    const { data } = await api.post('/api/eleves', { data: { ...base, mot_de_passe: password } })
+    return String(data?.data?.documentId)
+  } catch (e: any) {
+    if (e?.response?.status === 400) {
+      // fallback SANS mot_de_passe si le champ n’existe pas / n’est pas requis
+      const { data } = await api.post('/api/eleves', { data: base })
+      return String(data?.data?.documentId)
+    }
+    if (e?.response?.status === 403) {
+      throw new Error('Forbidden: active les permissions Eleve (create) pour Authenticated.')
+    }
+    throw e
+  }
 }
 
-// Relie un élève déjà créé au user (connect), avec fallback si nécessaire
 async function linkEleveToUser(eleveDocId: string, userId: number) {
   try {
     await api.put(`/api/eleves/${eleveDocId}`, {
       data: { [ELEVE_USER_FIELD]: { connect: [{ id: userId }] } }
     })
   } catch {
-    // certains schémas acceptent encore l'id direct
-    await api.put(`/api/eleves/${eleveDocId}`, {
-      data: { [ELEVE_USER_FIELD]: userId }
-    })
+    await api.put(`/api/eleves/${eleveDocId}`, { data: { [ELEVE_USER_FIELD]: userId } })
   }
 }
 
-// ── composant ───────────────────────────────────────────────────────────────
+// === component =============================================================
 
 export default function Register() {
   const { t } = useTranslation()
@@ -69,56 +73,60 @@ export default function Register() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [ideleve, setIdeleve] = useState<string>('') // si requis dans ton CT
+  const [ideleve, setIdeleve] = useState<string>('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-
-    if (!email || !password) {
-      setError(t('register.errors.missing'))
-      return
-    }
+    if (!email || !password) { setError(t('register.errors.missing')); return }
 
     try {
       setBusy(true)
 
-      // 1) Créer le user
-      let auth = await registerUser(name || email, email, password)
+      // ✅ 1) Utiliser l’email comme username pour éviter les collisions
+      const username = email.trim().toLowerCase()
 
-      // 2) Obtenir un JWT : si Strapi n'en renvoie pas (confirmation email activée), on login
-      if (!auth?.jwt) auth = await loginUser(email, password)
+      // ✅ 2) Tentative de création du user
+      let auth: any
+      try {
+        auth = await registerUser(username, email, password)
+      } catch (e: any) {
+        const msg = e?.response?.data?.error?.message || ''
+        const isTaken = /already taken/i.test(msg)
+        if (!isTaken) throw e
+        // ✅ 3) Email/username déjà pris → on tente un login auto
+        try {
+          auth = await loginUser(email, password)
+        } catch {
+          throw new Error('Ce compte existe déjà. Utilise la page de connexion.')
+        }
+      }
 
-      // 3) Sauvegarder l'auth → l'interceptor mettra le Bearer automatiquement
+      // ✅ 4) S’assurer d’avoir un JWT (si confirmation email ON, on a déjà loggé ci-dessus)
       saveAuth(auth)
-
       const userId: number = auth?.user?.id
       if (!userId) throw new Error('Missing user id after auth')
 
-      // 4) Créer l’élève séparément (ou récupérer s’il existe déjà)
+      // ✅ 5) Élève: récupérer ou créer séparément
       let eleveDocId = await findEleveByEmail(email)
       if (!eleveDocId) {
-        eleveDocId = await createEleve({
-          nom: name || email,
-          email_eleve: email,
-          ideleve: ideleve ? Number(ideleve) : undefined,
-          // mot_de_passe: password, // <-- dé-commente seulement si champ requis
+        eleveDocId = await createEleveSmart({
+          nom: name || email, email, ideleve, password
         })
       }
 
-      // 5) Relier l'élève au user (association)
+      // ✅ 6) Lier élève ↔ user
       await linkEleveToUser(eleveDocId, userId)
 
       alert(t('register.success'))
       nav('/', { replace: true })
     } catch (e: any) {
-      console.error('Register error:', e?.response?.data || e)
       const msg =
+        e?.message ||
         e?.response?.data?.error?.message ||
         e?.response?.data?.message ||
-        e?.message ||
         t('register.errors.failed')
       setError(String(msg))
     } finally {
@@ -164,4 +172,3 @@ export default function Register() {
     </div>
   )
 }
-
