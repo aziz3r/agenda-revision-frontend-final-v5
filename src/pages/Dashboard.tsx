@@ -1,3 +1,4 @@
+// src/pages/Dashboard.tsx
 import { useEffect, useMemo, useState } from 'react'
 import FullCalendar from '@fullcalendar/react'
 import dayGridPlugin from '@fullcalendar/daygrid'
@@ -6,7 +7,7 @@ import interactionPlugin from '@fullcalendar/interaction'
 import { api } from '../api/client'
 import './styles/Dashboard.css'
 import { useTranslation } from 'react-i18next'
-import { getAuth } from '../auth' // 🆕 on récupère l'user.id (plus sûr que l'email)
+import { getAuth } from '../auth'
 
 type Session = {
   id: number
@@ -29,6 +30,7 @@ type Examen = {
 }
 
 const palette = ['#E3C9B5', '#DDBAA5', '#F3E4D6', '#EAD8C8', '#DFC6B6', '#EEDBCB', '#E8D4C6']
+const colorOf = (seed: number) => palette[seed % palette.length]
 
 function normalizeExams(raw: any[]): Examen[] {
   return (raw ?? []).map((it: any) => {
@@ -59,6 +61,24 @@ function normalizeExams(raw: any[]): Examen[] {
   })
 }
 
+// util repli: vérifie si un exam appartient à l'user via la relation élève -> user
+function examBelongsToUser(item: any, userId?: number) {
+  if (!userId) return false
+  const a = item?.attributes ?? item
+  const eleves =
+    a?.eleves?.data ??
+    a?.eleve?.data ? [a?.eleve?.data] : [] // si relation 1–1
+  if (!eleves || eleves.length === 0) return false
+
+  return eleves.some((e: any) => {
+    const user =
+      e?.attributes?.user ||           // nom le plus fréquent
+      e?.attributes?.users_permissions_user // selon modèle personnalisé
+    const id = user?.id ?? user?.data?.id
+    return Number(id) === Number(userId)
+  })
+}
+
 export default function Dashboard() {
   const { t } = useTranslation()
   const [exams, setExams] = useState<Examen[]>([])
@@ -71,59 +91,67 @@ export default function Dashboard() {
     setLoading(true); setError(null)
     try {
       const userId = getAuth()?.user?.id
-      // Noms possibles de l'attribut de relation dans le CT "Exam" (ajuste si besoin)
-      const REL_KEYS = ['eleves', 'eleve', 'students']
+      const REL_KEYS = ['eleves', 'eleve', 'students'] // essaye plusieurs noms possibles
 
-      // paramètres communs (on laisse axios sérialiser via paramsSerializer)
       const baseParams: any = {
         fields: ['documentId', 'idexam', 'nom', 'date', 'poids'],
-        populate: { sessions: { fields: ['documentId', 'date_debut', 'date_fin'] } },
+        populate: {
+          sessions: { fields: ['documentId', 'date_debut', 'date_fin'] }
+        },
         pagination: { page: 1, pageSize: 100 },
         sort: ['date:asc']
       }
 
-      let found = false
+      // 1) Tentative: filtre côté API (meilleure perf)
+      let fromServer: any[] | null = null
       let lastErr: any = null
-
       for (const key of REL_KEYS) {
         try {
-          const params = {
-            ...baseParams,
-            // filtre par user.id : Exam -> (relation Eleve) -> (relation user) -> id
-            filters: { [key]: { user: { id: { $eq: userId ?? '' } } } }
-          }
-          const { data } = await api.get('/api/exams', { params })
-          setExams(normalizeExams(data?.data))
-          found = true
+          const { data } = await api.get('/api/exams', {
+            params: {
+              ...baseParams,
+              filters: { [key]: { user: { id: { $eq: userId ?? '' } } } }
+            }
+          })
+          fromServer = data?.data ?? []
           break
         } catch (e: any) {
           lastErr = e
           const msg: string = e?.response?.data?.error?.message || ''
-          // si c’est bien une 400 "Invalid key <...>", on essaie la clé suivante
           if (e?.response?.status === 400 && /Invalid key/i.test(msg)) {
+            // mauvais nom de relation : on tente la suivante
             continue
           }
-          // autre erreur (403, réseau, etc.) -> on la propage
-          throw e
+          // autre erreur (403/réseau) -> on remontera plus bas si le repli échoue
         }
       }
 
-      if (!found) {
-        // toutes les clés ont échoué (probablement pas le bon nom de relation)
-        throw lastErr ?? new Error('Invalid relation key on Exam')
+      // 2) Repli: récupérer + populate puis filtrer côté client par user.id
+      if (!fromServer) {
+        const { data } = await api.get('/api/exams', {
+          params: {
+            ...baseParams,
+            populate: {
+              ...baseParams.populate,
+              eleves: { fields: ['documentId'], populate: { user: { fields: ['id', 'email'] } } },
+              eleve: { fields: ['documentId'], populate: { user: { fields: ['id', 'email'] } } },
+            }
+          }
+        })
+        const rows = (data?.data ?? []).filter((it: any) => examBelongsToUser(it, userId))
+        setExams(normalizeExams(rows))
+      } else {
+        setExams(normalizeExams(fromServer))
       }
     } catch (e: any) {
       setError(e?.response?.data?.error?.message || t('common.loadingError'))
+      setExams([])
       console.error('[Dashboard load]', e?.response?.data || e)
-      setExams([]) // évite un état incohérent
     } finally {
       setLoading(false)
     }
   }
 
-  const colorOf = (seed: number) => palette[seed % palette.length]
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const events = useMemo(() => {
     const evts: any[] = []
     exams.forEach(ex => {
@@ -138,7 +166,7 @@ export default function Dashboard() {
           textColor: '#3b2f29'
         })
       }
-      ;(ex.sessions ?? []).forEach((s, i) => {
+      (ex.sessions ?? []).forEach((s, i) => {
         evts.push({
           id: `sess-${ex.documentId}-${s?.documentId ?? i}`,
           title: t('dash.event.session', { nom: ex.nom }),
@@ -150,7 +178,7 @@ export default function Dashboard() {
       })
     })
     return evts
-  }, [exams])
+  }, [exams, t])
 
   function generatePlan(ex: Examen) {
     if (!ex.date || !ex.poids) return []
@@ -199,6 +227,7 @@ export default function Dashboard() {
           data: { sessions: { connect: newSessionDocIds } }
         })
       } catch {
+        // fallback compat
         const exFull = await api.get(
           `/api/exams/${ex.documentId}?populate[sessions][fields][0]=documentId`
         )

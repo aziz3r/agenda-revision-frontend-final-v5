@@ -1,43 +1,60 @@
 // src/api/client.ts
 import axios from 'axios'
 import * as Qs from 'qs'
-import { getAuth } from '../auth' // 🆕 récupère { jwt, user } depuis localStorage
+import { getAuth } from '../auth'
 
-const rawBase = import.meta?.env?.VITE_API_URL
+// Base URL (sans / final)
+const BASE = (import.meta?.env?.VITE_API_URL || 'http://localhost:1337').replace(/\/$/, '')
+const TOKEN_ENV = import.meta?.env?.VITE_API_TOKEN
 
 export const api = axios.create({
-  baseURL: rawBase ? rawBase.replace(/\/$/, '') : 'http://localhost:1337',
-  headers: { 'Content-Type': 'application/json' },
-  // 🆕 permet d'utiliser api.get(url, { params: {...} }) avec la syntaxe Strapi
+  baseURL: BASE,
+  // Pour JSON, Axios mettra déjà le bon Content-Type ; on garde Accept
+  headers: { Accept: 'application/json' },
+  // Sérialise les objets imbriqués pour Strapi (filters, populate, sort, pagination…)
   paramsSerializer: {
     serialize: (params) => Qs.stringify(params as any, { encodeValuesOnly: true })
   }
 })
 
-// 🆕 Priorité au JWT de l'utilisateur connecté, sinon token d'API .env
-const tokenFromEnv = import.meta?.env?.VITE_API_TOKEN
+// --- Interceptor requête: ajoute le Bearer + gère FormData proprement
 api.interceptors.request.use((cfg) => {
   cfg.headers = cfg.headers ?? {}
-  const auth = getAuth()
-  if (auth?.jwt) {
-    (cfg.headers as any).Authorization = `Bearer ${auth.jwt}`
-  } else if (tokenFromEnv) {
-    (cfg.headers as any).Authorization = `Bearer ${tokenFromEnv}`
+
+  // 1) Auth: priorité au JWT (user), sinon token .env
+  const jwt = getAuth()?.jwt
+  if (jwt) (cfg.headers as any).Authorization = `Bearer ${jwt}`
+  else if (TOKEN_ENV) (cfg.headers as any).Authorization = `Bearer ${TOKEN_ENV}`
+
+  // 2) Uploads: si FormData, laisser le navigateur définir le boundary
+  const isFormData =
+    (typeof FormData !== 'undefined') &&
+    (cfg.data instanceof FormData || cfg.data?.__proto__?.constructor?.name === 'FormData')
+  if (isFormData) {
+    // Axios ajoutera automatiquement le bon Content-Type multipart/*
+    delete (cfg.headers as any)['Content-Type']
+  } else {
+    // Pour JSON, on s'assure du header (utile sur certains environnements)
+    (cfg.headers as any)['Content-Type'] = 'application/json'
   }
+
   return cfg
 })
 
+// --- Interceptor réponse: log clair et propagation de l'erreur
 api.interceptors.response.use(
   (r) => r,
   (err) => {
-    const msg = err?.response?.data?.error?.message
-      || err?.response?.data?.message
-      || err?.message
-    console.error('[API ERROR]', msg, err?.response?.data)
+    const status = err?.response?.status
+    const msg =
+      err?.response?.data?.error?.message ||
+      err?.response?.data?.message ||
+      err?.message
+    console.error('[API ERROR]', status, msg, err?.response?.data)
     return Promise.reject(err)
   }
 )
 
-// util pour sérialiser "à la main" si tu construis l'URL toi-même
+// Helper si tu construis l’URL manuellement
 export const qs = (obj: unknown) =>
   Qs.stringify(obj as any, { encodeValuesOnly: true })

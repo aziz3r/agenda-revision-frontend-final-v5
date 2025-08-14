@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom"; // 🆕 Link
 import { api } from "../api/client";
 import { saveAuth } from "../auth";
 import { useTranslation } from "react-i18next";
@@ -51,10 +51,14 @@ export default function Login() {
             <label>{t("login.password")}</label>
             <input className="input" type="password" value={pwd} onChange={e=>setPwd(e.target.value)} required />
           </div>
-          <div className="actions">
+          <div className="actions" style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
             <button className="btn brand" type="submit" disabled={busy}>
               {busy ? "…" : t("login.signIn")}
             </button>
+            {/* 🆕 bouton pour créer un compte */}
+            <Link to="/register" className="btn">
+              {t("login.createAccount")}
+            </Link>
           </div>
         </div>
       </form>

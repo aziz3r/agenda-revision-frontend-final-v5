@@ -1,5 +1,24 @@
 {
-
+"register": {
+    "title": "Créer un compte",
+    "fields": {
+      "name": "Nom",
+      "email": "Email",
+      "password": "Mot de passe",
+      "ideleve": "ID élève"
+    },
+    "placeholders": {
+      "name": "Votre nom (optionnel)"
+    },
+    "submit": "S'inscrire",
+    "success": "Compte créé ! Bienvenue 👋",
+    "haveAccount": "Déjà inscrit ?",
+    "signIn": "Se connecter",
+    "errors": {
+      "missing": "Merci de renseigner l'email et le mot de passe.",
+      "failed": "Échec de l'inscription."
+    }
+  },
   "account": {
     "short": "Compte",
     "switch": "Changer d'utilisateur",

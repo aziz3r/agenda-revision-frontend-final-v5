@@ -1,16 +1,63 @@
 import './styles/Examens.css'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppDispatch, useAppSelector } from '../redux/hooks'
 import { deleteExam, fetchExams, setPage } from '../redux/slices/examensSlice'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { getAuth } from '../auth'
+import { api } from '../api/client'
+
+// Nom du champ relation Exam -> Élève dans ton schéma
+const EXAM_TO_ELEVES_FIELD = 'eleves'  // adapte si ton champ est "eleve" (singulier)
 
 export default function Examens() {
   const { t } = useTranslation()
   const d = useAppDispatch()
   const { items, page, pageSize, pageCount, loading, error } = useAppSelector(s => s.examens)
 
-  useEffect(() => { d(fetchExams({ page, pageSize })) }, [d, page, pageSize])
+  const [relKey, setRelKey] = useState<string | null>(EXAM_TO_ELEVES_FIELD)
+
+  useEffect(() => {
+    (async () => {
+      const userId = getAuth()?.user?.id
+      if (!userId) return
+
+      // On essaye "eleves" puis "eleve" si besoin (évite l’erreur "Invalid key …")
+      const CANDIDATES = [EXAM_TO_ELEVES_FIELD, 'eleve']
+
+      let validKey: string | null = null
+      for (const key of CANDIDATES) {
+        try {
+          await api.get('/api/exams', {
+            params: {
+              filters: { [key]: { user: { id: { $eq: userId } } } },
+              fields: ['id'], pagination: { page: 1, pageSize: 1 }
+            }
+          })
+          validKey = key
+          break
+        } catch (e: any) {
+          const msg = e?.response?.data?.error?.message || ''
+          if (e?.response?.status === 400 && /Invalid key/i.test(msg)) continue
+          // autre erreur -> on s’arrête, le thunk affichera l’erreur
+          validKey = key
+          break
+        }
+      }
+      setRelKey(validKey ?? EXAM_TO_ELEVES_FIELD)
+    })()
+  }, [])
+
+  useEffect(() => {
+    const userId = getAuth()?.user?.id
+    if (!userId || !relKey) return
+    // 👉 On passe le filtre au thunk (voir patch du slice ci-dessous)
+    d(fetchExams({
+      page,
+      pageSize,
+      filters: { [relKey]: { user: { id: { $eq: userId } } } }
+    }))
+  }, [d, page, pageSize, relKey])
 
   return (
     <section className="card">
@@ -21,6 +68,7 @@ export default function Examens() {
       <div className="card-body">
         {loading && <p className="small">{t('common.loading')}</p>}
         {error && <p className="small" role="alert">{t('common.error')}: {error}</p>}
+
         <div style={{ overflowX:'auto' }}>
           <table className="table">
             <thead>
@@ -46,7 +94,6 @@ export default function Examens() {
                   <td className="actions">
                     <div className="controls">
                       <Link className="btn" to={`/examens/${ex.documentId}/edit`}>{t('actions.edit')}</Link>
-                      {/* ✅ Seule ligne modifiée : utiliser documentId pour Strapi v5 */}
                       <button className="btn danger" onClick={() => d(deleteExam(ex.documentId))}>{t('actions.delete')}</button>
                     </div>
                   </td>

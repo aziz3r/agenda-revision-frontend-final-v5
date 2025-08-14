@@ -1,5 +1,27 @@
 {
 
+
+  "register": {
+    "title": "Create an account",
+    "fields": {
+      "name": "Name",
+      "email": "Email",
+      "password": "Password",
+      "ideleve": "Student ID"
+    },
+    "placeholders": {
+      "name": "Your name (optional)"
+    },
+    "submit": "Sign up",
+    "success": "Account created! Welcome 👋",
+    "haveAccount": "Already registered?",
+    "signIn": "Sign in",
+    "errors": {
+      "missing": "Please fill in email and password.",
+      "failed": "Registration failed."
+    }
+  },
+  
    "account": {
     "short": "Account",
     "switch": "Switch user",
