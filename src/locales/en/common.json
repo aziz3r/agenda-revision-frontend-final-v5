@@ -1,0 +1,26 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "error": "Error"
+  },
+  "actions": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "prev": "Previous",
+    "next": "Next"
+  },
+  "examens": {
+    "title": "Exams",
+    "addLabel": "+ Add",
+    "page_of": "Page {{page}} / {{pageCount}}",
+    "cols": {
+      "id": "ID",
+      "idexam": "IDExam",
+      "ref": "Reference",
+      "name": "Name",
+      "date": "Date",
+      "weight": "Weight",
+      "actions": "Actions"
+    }
+  }
+}
