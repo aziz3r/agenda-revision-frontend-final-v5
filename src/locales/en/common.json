@@ -1,4 +1,10 @@
 {
+
+   "account": {
+    "short": "Account",
+    "switch": "Switch user",
+    "switchConfirm": "Sign out to switch user?"
+  },
   "app": {
     "title": "Revision Agenda"
   },

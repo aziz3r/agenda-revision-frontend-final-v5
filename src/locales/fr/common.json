@@ -1,4 +1,11 @@
 {
+
+  "account": {
+    "short": "Compte",
+    "switch": "Changer d'utilisateur",
+    "switchConfirm": "Se déconnecter pour changer d'utilisateur ?"
+  },
+
   "app": {
     "title": "Agenda de Révision"
   },

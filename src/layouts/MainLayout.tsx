@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import './MainLayout.css'
 import { useTranslation } from 'react-i18next'
 import LangSwitch from '../components/LangSwitch'
+import SwitchUser from '../components/SwitchUser'   // 🆕 bouton compte (changer d'utilisateur)
 
 const IconHome = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -46,6 +47,9 @@ export default function MainLayout() {
 
             {/* Sélecteur de langue */}
             <LangSwitch />
+
+            {/* 🆕 Icône compte : déconnexion + redirection /login pour changer d'utilisateur */}
+            <SwitchUser />
           </nav>
         </div>
       </header>
