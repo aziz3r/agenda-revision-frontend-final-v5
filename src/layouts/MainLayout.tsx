@@ -48,7 +48,7 @@ export default function MainLayout() {
             {/* Sélecteur de langue */}
             <LangSwitch />
 
-            {/* 🆕 Icône compte : déconnexion + redirection /login pour changer d'utilisateur */}
+            { /* Icône compte : déconnexion + redirection /login pour changer d'utilisateur */}
             <SwitchUser />
           </nav>
         </div>

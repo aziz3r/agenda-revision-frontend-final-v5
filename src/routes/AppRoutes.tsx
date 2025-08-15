@@ -7,7 +7,7 @@ import AddExamen from '../pages/AddExamen'
 import EditExamen from '../pages/EditExamen'
 import Login from '../pages/Login'
 import Register from '../pages/Register'
-import { getAuth } from '../auth' // <- récupère { jwt, user } depuis le localStorage
+import { getAuth } from '../auth' 
 
 // Garde d'authentification (protège les routes enfants)
 function PrivateRoute() {
